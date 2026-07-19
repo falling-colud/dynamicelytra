@@ -1,0 +1,11 @@
+# Gradle
+.gradle/
+build/
+run/
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
