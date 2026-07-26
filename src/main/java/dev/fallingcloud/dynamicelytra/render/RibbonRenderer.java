@@ -169,12 +169,19 @@ public final class RibbonRenderer {
         Tesselator tess = Tesselator.getInstance();
         BufferBuilder bb = tess.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION_TEX_COLOR);
 
+        // INVARIANT: every path out of this loop must reach bb.build() below. Returning early abandons the
+        // Tesselator's shared buffer mid-build — its write offset stays advanced, so the next mesh built from
+        // it (the tip line, just below: same format, same strip mode) comes back with these orphaned vertices
+        // welded onto its front and draws as a garbage strip smeared across the scene. That is what made the
+        // player flicker away for a few frames at a time. Fall back, never return.
         float uLen = 0f;
-        Vec3 prevSide = null, prevPerp = null;
+        Vec3 prevSide = null, prevPerp = null, prevTangent = null;
         for (int i = 0; i < count; i++) {
             Sample s = dense.get(i);
             Vec3 tangent = tangentAt(dense, i);
-            if (tangent == null) return;
+            if (tangent == null) tangent = prevTangent;         // hairpin: reuse the last good direction
+            if (tangent == null) continue;                      // no direction yet; the strip just starts later
+            prevTangent = tangent;
             Vec3 sideVec = sideAxis(tangent, s.pos(), cam, prevSide);
             prevSide = sideVec;
 
@@ -230,11 +237,14 @@ public final class RibbonRenderer {
         BufferBuilder bb = tess.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION_TEX_COLOR);
 
         float uLen = 0f;
-        Vec3 prevSide = null;
+        Vec3 prevSide = null, prevTangent = null;
         for (int i = 0; i < count; i++) {
             Sample s = dense.get(i);
+            // Same invariant as emitStream: reach bb.build() on every path, never abandon the shared buffer.
             Vec3 tangent = tangentAt(dense, i);
-            if (tangent == null) return;
+            if (tangent == null) tangent = prevTangent;
+            if (tangent == null) continue;
+            prevTangent = tangent;
             Vec3 sideVec = sideAxis(tangent, s.pos(), cam, prevSide);
             prevSide = sideVec;
 
@@ -277,7 +287,12 @@ public final class RibbonRenderer {
      * blindly differencing the adjacent pair this searches outward for the nearest samples that are actually
      * apart. The old code fell back to a hard-coded "straight up" whenever the pair coincided, which yanked the
      * ribbon's orientation 90° for a frame — the twitch at the wings. Falls back to the ribbon's overall
-     * direction, and returns null only if the whole ribbon is a single point (caller then skips it).
+     * direction.
+     *
+     * <p>Returns null when no direction can be had here. That is <em>not</em> only the whole-ribbon-is-one-point
+     * case: it also fires mid-ribbon on a hairpin, where the nearest distinct samples on either side land on top
+     * of each other and cancel. Callers must therefore treat null as "reuse the last good tangent" and carry on
+     * to their {@code build()} — see the invariant in {@link #emitStream}.
      */
     private static Vec3 tangentAt(List<Sample> dense, int i) {
         int count = dense.size();

@@ -9,3 +9,7 @@ run/
 *.ipr
 *.iws
 .vscode/
+*.log
+ports/
+gametest*
+jartest*

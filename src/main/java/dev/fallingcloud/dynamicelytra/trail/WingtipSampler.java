@@ -24,21 +24,27 @@ import org.joml.Vector3f;
 public final class WingtipSampler {
 
     // ElytraModel geometry (pixels): wings pivot at (±5, 0, 0); each wing is a 10x20x2 box with +1
-    // deformation, so the plate spans local x∈[-11,1], y∈[-1,21]. When the wings spread (zRot → -90°) the
-    // 20px y-axis becomes the SPAN, so y sets how far out the emission point sits.
+    // deformation, so the plate spans local x∈[-11,1], y∈[-1,21], z∈[-1,3]. When the wings spread (zRot → -90°)
+    // the 20px y-axis becomes the SPAN, so y sets how far out the emission point sits; x is then the chord and
+    // z stays the plate's normal.
     private static final float PIVOT_X = 5.0f / 16.0f;
-    private static final float TIP_X = 10.0f / 16.0f;
+    /**
+     * Chord position: 2px past the plate's trailing edge (x = −11, measured from the pivot).
+     *
+     * <p>The emission point has to sit outside the plate. Buried inside it, the trail's head fought the wing's
+     * own depth and flickered in and out as the wing animated (a classic z-fight). The clearance belongs on
+     * <b>this</b> axis: with the wings spread, local x is the chord, which the transform chain maps to world
+     * <i>backward</i> — so stepping out along it puts the head just behind the trailing edge, level with the
+     * wing, which is where a real wing sheds vapor anyway.
+     *
+     * <p>Taking that clearance on z instead also cleared the geometry, but z is the plate's normal, and in a
+     * glide the chain maps it to world <i>up</i> — which is why the lines visibly started above the model.
+     */
+    private static final float TIP_X = 13.0f / 16.0f;
     /** Span position: pulled 2px inside the outer edge (21) so the line starts ON the wing, not off its tip. */
     private static final float TIP_Y = 19.0f / 16.0f;
-    /**
-     * Chord position: just BEHIND the wing plate's back face (the box spans z ∈ [-1, 3]).
-     *
-     * <p>This must sit outside the plate. At the old z=1 — dead centre of its 4px thickness — the trail's head
-     * was buried inside the elytra geometry, so its fragments fought the wing's own depth and flickered in and
-     * out as the wing animated (a classic z-fight). Emitting from behind the trailing edge clears the model
-     * entirely and is where a real wing sheds vapor anyway.
-     */
-    private static final float TIP_Z = 5.0f / 16.0f;
+    /** Thickness position: the plate's mid-plane, so the line rides level with the wing rather than off a face. */
+    private static final float TIP_Z = 1.0f / 16.0f;
 
     private WingtipSampler() {}
 
